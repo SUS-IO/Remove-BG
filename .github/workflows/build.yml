@@ -1,0 +1,41 @@
+name: Build Windows app
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install packages
+        run: pip install "rembg[cpu]" pillow pyinstaller
+
+      - name: Download AI models (bundled into the app)
+        shell: pwsh
+        run: |
+          $env:U2NET_HOME = "$PWD\models"
+          python -c "from rembg import new_session; [new_session(m) for m in ('u2net','isnet-general-use','u2netp')]"
+          Get-ChildItem models
+
+      - name: Build app
+        run: >
+          pyinstaller --noconfirm --windowed --name BGRemover
+          --collect-all rembg --collect-all onnxruntime
+          --collect-all pymatting --collect-all numba --collect-all llvmlite
+          --add-data "models;models"
+          bg_remover.py
+
+      - name: Upload app
+        uses: actions/upload-artifact@v4
+        with:
+          name: BGRemover-Windows
+          path: dist/BGRemover
+          retention-days: 30
